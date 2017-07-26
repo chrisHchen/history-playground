@@ -2,6 +2,29 @@ import React, {Component} from 'react';
 import ReactDOM from 'react-dom';
 
 let notListened = true
+let currentActiveIndex = 0
+let historyList = []
+const pushHistory = function(state){
+  if(currentActiveIndex == historyList.length - 1){
+    historyList.push(state)
+  }else{
+    historyList.splice(currentActiveIndex + 1, historyList.length - currentActiveIndex, state)
+  }
+}
+
+const replaceHistory = function(state){
+  historyList.splice(currentActiveIndex, 1, state)
+}
+
+const findCurrentHistoryIndex = function(state){
+  if(!state) return currentActiveIndex = 0
+  historyList.some((h, index) => {
+    if(h.id == state.id){
+      currentActiveIndex = index
+      return true
+    }
+  })
+}
 
 class Route extends Component{
   constructor(props){
@@ -27,36 +50,47 @@ class Link extends Component{
     if(notListened){
       window.addEventListener('popstate', (event) => {
         const state = event.state
+        findCurrentHistoryIndex(state)
         this.props.callback(state ? state.path : null)
       })
       notListened = false
     }
   }
   handleClick = (event) => {
-    const {title, to, callback} = this.props
+    event.preventDefault()
+    const {title, to, callback, replace} = this.props
     const stateObj = {
-      path:to
+      path:to,
+      id: Date.now()
     }
-    history.pushState(stateObj, title, to);
+    if(replace){
+      history.replaceState(stateObj, title, to);
+      replaceHistory(stateObj)
+    }else{
+      history.pushState(stateObj, title, to);
+      pushHistory(stateObj)
+    }
+    findCurrentHistoryIndex(stateObj)
     callback(to)
   }
   render(){
-    const {to} = this.props
-    return <button onClick={this.handleClick}>{to}</button>
+    const {children} = this.props
+    return (
+      <a href="" onClick={this.handleClick}>{children}</a>
+    )
   }
 }
 
-const Hello = ({path}) => {
-  return (
-    <div>Hello at: {path}</div>
-  )
+const generateComp = (name) => {
+  return ({path}) => {
+    return <div>{name} at:{path}</div>
+  }
 }
 
-const About = ({path}) => {
-  return (
-    <div>About at: {path}</div>
-  )
-}
+const Home = generateComp('Home')
+const About = generateComp('About')
+const Hello = generateComp('Hello')
+const Welcome = generateComp('Welcome')
 
 class App extends Component{
   state = {
@@ -78,15 +112,31 @@ class App extends Component{
   render(){
     return (
       <div>
-        <Link to='/test/hello' callback={this.callback}></Link>
+        <Link to='/test/hello' callback={this.callback}>Hello</Link>
         <br/>
-        <Link to='/test/about' callback={this.callback}></Link>
+        <Link to='/test/about' callback={this.callback}>About</Link>
+        <br/>
+        <Link to='/test/welcome' callback={this.callback} replace>Welcome(replace)</Link>
+        <br/>
+        <Link to='/test/home' callback={this.callback}>Home</Link>
         <Route path='/test/hello' currentPath={this.state.path}>
           <Hello></Hello>
         </Route>
         <Route path='/test/about' currentPath={this.state.path}>
           <About></About>
         </Route>
+        <Route path='/test/welcome' currentPath={this.state.path}>
+          <Welcome></Welcome>
+        </Route>
+        <Route path='/test/home' currentPath={this.state.path}>
+          <Home></Home>
+        </Route>
+        <br/>
+        <br/>
+        <h2>History List</h2>
+        {
+          historyList.map((h, index) => <div style={{color:currentActiveIndex == index ? 'red':'black'}} key={h.id}>{h.path}</div>)
+        }
       </div>
     )
   }
